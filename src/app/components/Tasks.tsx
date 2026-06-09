@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Trash2, Pencil, Check, X } from 'lucide-react'
 
 type Task = {
   id: string
@@ -136,6 +136,19 @@ export default function Tasks({ userId }: { userId: string }) {
     await supabase.from('tasks').update({ status: newStatus }).eq('id', task.id)
     setTasks((prev) =>
       prev.map((t) => (t.id === task.id ? { ...t, status: newStatus } : t))
+    )
+  }
+
+  async function deleteTask(taskId: string) {
+    await supabase.from('tasks').delete().eq('id', taskId)
+    setTasks((prev) => prev.filter((t) => t.id !== taskId))
+  }
+
+  async function editTask(taskId: string, newTitle: string) {
+    if (!newTitle.trim()) return
+    await supabase.from('tasks').update({ title: newTitle.trim() }).eq('id', taskId)
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, title: newTitle.trim() } : t))
     )
   }
 
@@ -284,7 +297,7 @@ export default function Tasks({ userId }: { userId: string }) {
       {pending.length > 0 && (
         <div className="flex flex-col gap-2">
           {pending.map((task) => (
-            <TaskCard key={task.id} task={task} onToggle={toggleTask} />
+            <TaskCard key={task.id} task={task} onToggle={toggleTask} onDelete={deleteTask} onEdit={editTask} />
           ))}
         </div>
       )}
@@ -296,7 +309,7 @@ export default function Tasks({ userId }: { userId: string }) {
             Выполнено
           </p>
           {completed.map((task) => (
-            <TaskCard key={task.id} task={task} onToggle={toggleTask} done />
+            <TaskCard key={task.id} task={task} onToggle={toggleTask} onDelete={deleteTask} onEdit={editTask} done />
           ))}
         </div>
       )}
@@ -322,12 +335,26 @@ export default function Tasks({ userId }: { userId: string }) {
 function TaskCard({
   task,
   onToggle,
+  onDelete,
+  onEdit,
   done = false,
 }: {
   task: Task
   onToggle: (task: Task) => void
+  onDelete: (id: string) => void
+  onEdit: (id: string, title: string) => void
   done?: boolean
 }) {
+  const [editing, setEditing] = useState(false)
+  const [editValue, setEditValue] = useState(task.title)
+
+  function saveEdit() {
+    if (editValue.trim() && editValue.trim() !== task.title) {
+      onEdit(task.id, editValue.trim())
+    }
+    setEditing(false)
+  }
+
   return (
     <div
       className="rounded-xl p-4 flex items-start gap-3"
@@ -337,82 +364,89 @@ function TaskCard({
         opacity: done ? 0.5 : 1,
       }}
     >
+      {/* Чекбокс */}
       <button
         onClick={() => onToggle(task)}
         style={{
-          width: '22px',
-          height: '22px',
-          borderRadius: '50%',
+          width: '22px', height: '22px', borderRadius: '50%',
           border: done ? 'none' : '2px solid var(--border)',
           background: done ? '#22c55e' : 'transparent',
-          cursor: 'pointer',
-          flexShrink: 0,
-          marginTop: '1px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#fff',
-          fontSize: '12px',
+          cursor: 'pointer', flexShrink: 0, marginTop: '2px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontSize: '12px',
         }}
       >
         {done && '✓'}
       </button>
 
-      <div className="flex-1 flex flex-col gap-1">
-        <p
-          style={{
+      {/* Контент */}
+      <div className="flex-1 flex flex-col gap-1 min-w-0">
+        {editing ? (
+          <div className="flex gap-2 items-center">
+            <input
+              autoFocus
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditing(false) }}
+              style={{
+                flex: 1, background: 'var(--surface-2)', border: '1px solid var(--accent)',
+                borderRadius: '8px', padding: '4px 8px', color: 'var(--text)',
+                fontSize: '15px', outline: 'none',
+              }}
+            />
+            <button onClick={saveEdit} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}>
+              <Check size={16} color="#22c55e" />
+            </button>
+            <button onClick={() => setEditing(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}>
+              <X size={16} color="var(--text-muted)" />
+            </button>
+          </div>
+        ) : (
+          <p style={{
             color: done ? 'var(--text-muted)' : 'var(--text)',
-            fontSize: '15px',
-            lineHeight: '1.4',
+            fontSize: '15px', lineHeight: '1.4',
             textDecoration: done ? 'line-through' : 'none',
-          }}
-        >
-          {task.title}
-        </p>
-        {!done && (
+          }}>
+            {task.title}
+          </p>
+        )}
+
+        {!done && !editing && (
           <div className="flex gap-2 flex-wrap">
             {task.time && (
-              <span
-                style={{
-                  fontSize: '11px',
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  background: '#7c3aed22',
-                  color: 'var(--accent)',
-                  fontWeight: '600',
-                }}
-              >
+              <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: '#7c3aed22', color: 'var(--accent)', fontWeight: '600' }}>
                 🕐 {task.time}
               </span>
             )}
-            <span
-              style={{
-                fontSize: '11px',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                background: (priorityColor[task.priority] ?? '#6b7280') + '22',
-                color: priorityColor[task.priority] ?? '#6b7280',
-                fontWeight: '600',
-              }}
-            >
+            <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: (priorityColor[task.priority] ?? '#6b7280') + '22', color: priorityColor[task.priority] ?? '#6b7280', fontWeight: '600' }}>
               {priorityLabel[task.priority] ?? task.priority}
             </span>
             {task.category && (
-              <span
-                style={{
-                  fontSize: '11px',
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  background: 'var(--surface-2)',
-                  color: 'var(--text-muted)',
-                }}
-              >
+              <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
                 {task.category}
               </span>
             )}
           </div>
         )}
       </div>
+
+      {/* Кнопки редактирования и удаления */}
+      {!editing && (
+        <div className="flex gap-1 flex-shrink-0">
+          <button
+            onClick={() => { setEditValue(task.title); setEditing(true) }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '3px' }}
+          >
+            <Pencil size={14} color="var(--text-muted)" />
+          </button>
+          <button
+            onClick={() => onDelete(task.id)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '3px' }}
+          >
+            <Trash2 size={14} color="#ef444477" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
