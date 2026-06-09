@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useLang } from '@/lib/LanguageContext'
 
 type HabitLog = { id: string; date: string; completed: boolean; motivation: string | null }
 
@@ -40,6 +41,7 @@ const DEFAULT_EMOJI: Record<string, string> = {
 }
 
 export default function Habits({ userId }: { userId: string }) {
+  const { tr, lang } = useLang()
   const [habits, setHabits] = useState<Habit[]>([])
   const [showNew, setShowNew] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -49,6 +51,7 @@ export default function Habits({ userId }: { userId: string }) {
   const [creating, setCreating] = useState(false)
   const supabase = createClient()
   const today = toLocalDate(new Date())
+  const locale = lang === 'ru' ? 'ru-RU' : 'en-US'
 
   useEffect(() => {
     loadHabits()
@@ -100,7 +103,7 @@ export default function Habits({ userId }: { userId: string }) {
       })
       const json = await res.json()
       motivation = json.phrase || null
-    } catch { /* используем без фразы */ }
+    } catch { /* continue without phrase */ }
 
     const { data: log } = await supabase
       .from('habit_logs')
@@ -136,12 +139,11 @@ export default function Habits({ userId }: { userId: string }) {
         onClick={() => setShowNew((v) => !v)}
         style={{ background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '10px', padding: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
       >
-        {showNew ? 'Отмена' : '+ Новая привычка'}
+        {showNew ? tr.cancel : tr.habits.newHabit}
       </button>
 
       {showNew && (
         <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-          {/* Тип привычки */}
           <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--border)' }}>
             {(['build', 'quit'] as const).map((t) => (
               <button
@@ -153,7 +155,7 @@ export default function Habits({ userId }: { userId: string }) {
                   color: newType === t ? '#fff' : 'var(--text-muted)',
                 }}
               >
-                {t === 'build' ? '✅ Внедрить' : '🚫 Бросить'}
+                {t === 'build' ? tr.habits.buildTab : tr.habits.quitTab}
               </button>
             ))}
           </div>
@@ -170,7 +172,7 @@ export default function Habits({ userId }: { userId: string }) {
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addHabit()}
-              placeholder={newType === 'build' ? 'Читать 30 минут каждый день' : 'Бросить курить'}
+              placeholder={newType === 'build' ? tr.habits.buildPlaceholder : tr.habits.quitPlaceholder}
               style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text)', fontSize: '14px', outline: 'none' }}
             />
           </div>
@@ -180,7 +182,7 @@ export default function Habits({ userId }: { userId: string }) {
             disabled={!newTitle.trim() || creating}
             style={{ background: newTitle.trim() ? 'var(--accent)' : 'var(--surface-2)', border: 'none', color: newTitle.trim() ? '#fff' : 'var(--text-muted)', borderRadius: '8px', padding: '10px', fontSize: '14px', fontWeight: '600', cursor: newTitle.trim() ? 'pointer' : 'default' }}
           >
-            {creating ? '...' : 'Создать привычку'}
+            {creating ? '...' : tr.habits.createBtn}
           </button>
         </div>
       )}
@@ -188,8 +190,8 @@ export default function Habits({ userId }: { userId: string }) {
       {habits.length === 0 && !showNew && (
         <div className="rounded-xl p-6 text-center" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
           <p style={{ fontSize: '32px', marginBottom: '8px' }}>🔥</p>
-          <p style={{ color: 'var(--text)', fontSize: '15px', fontWeight: '600', marginBottom: '4px' }}>Нет привычек</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Добавь привычку которую хочешь внедрить или бросить</p>
+          <p style={{ color: 'var(--text)', fontSize: '15px', fontWeight: '600', marginBottom: '4px' }}>{tr.habits.emptyTitle}</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{tr.habits.emptySubtitle}</p>
         </div>
       )}
 
@@ -206,40 +208,36 @@ export default function Habits({ userId }: { userId: string }) {
             className="rounded-xl flex flex-col"
             style={{ background: 'var(--surface)', border: `1px solid ${isDone ? '#22c55e44' : 'var(--border)'}`, overflow: 'hidden' }}
           >
-            {/* Шапка */}
             <div className="flex items-center gap-3 p-4">
               <span style={{ fontSize: '28px', lineHeight: 1 }}>{emoji}</span>
               <div className="flex-1 min-w-0">
                 <p style={{ color: 'var(--text)', fontSize: '15px', fontWeight: '600', lineHeight: 1.3 }}>{habit.title}</p>
                 <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '2px' }}>
-                  {habit.type === 'quit' ? '🚫 Избавляюсь' : '✅ Формирую'}
+                  {habit.type === 'quit' ? tr.habits.typeQuit : tr.habits.typeBuild}
                 </p>
               </div>
 
-              {/* Стрик */}
               <div style={{ textAlign: 'center', flexShrink: 0 }}>
                 <p style={{ color: streak > 0 ? '#f59e0b' : 'var(--text-muted)', fontSize: '20px', fontWeight: '800', lineHeight: 1 }}>
                   {streak > 0 ? '🔥' : '—'}
                 </p>
                 {streak > 0 && (
-                  <p style={{ color: '#f59e0b', fontSize: '11px', fontWeight: '700' }}>{streak} дн.</p>
+                  <p style={{ color: '#f59e0b', fontSize: '11px', fontWeight: '700' }}>{tr.habits.streakDays(streak)}</p>
                 )}
               </div>
             </div>
 
-            {/* Мотивационная фраза */}
             {isDone && todayLog?.motivation && (
               <div style={{ background: '#22c55e11', borderTop: '1px solid #22c55e33', padding: '10px 16px' }}>
                 <p style={{ color: '#22c55e', fontSize: '13px', lineHeight: 1.5 }}>{todayLog.motivation}</p>
               </div>
             )}
 
-            {/* Кнопка отметки */}
             <div style={{ padding: '0 16px 14px', marginTop: isDone && todayLog?.motivation ? 0 : '-4px' }}>
               {isDone ? (
                 <div style={{ background: '#22c55e22', border: '1px solid #22c55e44', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
                   <p style={{ color: '#22c55e', fontSize: '13px', fontWeight: '600' }}>
-                    ✓ {habit.type === 'quit' ? 'Держишься сегодня!' : 'Выполнено сегодня!'}
+                    ✓ {habit.type === 'quit' ? tr.habits.doneQuit : tr.habits.doneBuild}
                   </p>
                 </div>
               ) : (
@@ -253,15 +251,15 @@ export default function Habits({ userId }: { userId: string }) {
                   }}
                 >
                   {isLoading
-                    ? '⏳ Получаю мотивацию...'
+                    ? tr.habits.gettingMotivation
                     : habit.type === 'quit'
-                    ? '💪 Держусь!'
-                    : '✅ Выполнил!'}
+                    ? tr.habits.checkQuit
+                    : tr.habits.checkBuild}
                 </button>
               )}
             </div>
 
-            {/* Последние 7 дней */}
+            {/* Last 7 days */}
             <div style={{ borderTop: '1px solid var(--border)', padding: '10px 16px', display: 'flex', gap: '6px', justifyContent: 'center' }}>
               {Array.from({ length: 7 }, (_, i) => {
                 const d = new Date()
@@ -276,13 +274,22 @@ export default function Habits({ userId }: { userId: string }) {
                       {done ? '✓' : ''}
                     </div>
                     <p style={{ color: 'var(--text-muted)', fontSize: '10px' }}>
-                      {d.toLocaleDateString('ru-RU', { weekday: 'short' }).slice(0, 2)}
+                      {d.toLocaleDateString(locale, { weekday: 'short' }).slice(0, 2)}
                     </p>
                   </div>
                 )
               })}
             </div>
 
+            {/* Delete */}
+            <div style={{ borderTop: '1px solid var(--border)', padding: '8px 16px', textAlign: 'right' }}>
+              <button
+                onClick={() => deleteHabit(habit.id)}
+                style={{ background: 'none', border: 'none', color: '#ef444466', fontSize: '12px', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
           </div>
         )
       })}

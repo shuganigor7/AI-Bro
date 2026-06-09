@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight, Trash2, Pencil, Check, X } from 'lucide-react'
+import { useLang } from '@/lib/LanguageContext'
+import { ChevronLeft, ChevronRight, Trash2, Pencil, Check, X, Mic, MicOff } from 'lucide-react'
 
 type Task = {
   id: string
@@ -21,12 +22,6 @@ const priorityColor: Record<string, string> = {
   low: '#6b7280',
 }
 
-const priorityLabel: Record<string, string> = {
-  high: 'Высокий',
-  medium: 'Средний',
-  low: 'Низкий',
-}
-
 function toLocalDate(date: Date): string {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
@@ -34,22 +29,24 @@ function toLocalDate(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
-function formatDateLabel(dateStr: string): string {
+function formatDateLabel(
+  dateStr: string,
+  labels: { today: string; yesterday: string; tomorrow: string },
+  locale: string
+): string {
   const today = toLocalDate(new Date())
   const yesterday = toLocalDate(new Date(Date.now() - 86400000))
   const tomorrow = toLocalDate(new Date(Date.now() + 86400000))
-
   const date = new Date(dateStr + 'T00:00:00')
-  const dateShort = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
-
-  if (dateStr === today) return `Сегодня, ${dateShort}`
-  if (dateStr === yesterday) return `Вчера, ${dateShort}`
-  if (dateStr === tomorrow) return `Завтра, ${dateShort}`
-
+  const dateShort = date.toLocaleDateString(locale, { day: 'numeric', month: 'long' })
+  if (dateStr === today) return `${labels.today}, ${dateShort}`
+  if (dateStr === yesterday) return `${labels.yesterday}, ${dateShort}`
+  if (dateStr === tomorrow) return `${labels.tomorrow}, ${dateShort}`
   return dateShort
 }
 
 export default function Tasks({ userId }: { userId: string }) {
+  const { tr, lang } = useLang()
   const [tasks, setTasks] = useState<Task[]>([])
   const [selectedDate, setSelectedDate] = useState(toLocalDate(new Date()))
   const [input, setInput] = useState('')
@@ -59,6 +56,9 @@ export default function Tasks({ userId }: { userId: string }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null)
   const supabase = createClient()
+
+  const locale = lang === 'ru' ? 'ru-RU' : 'en-US'
+  const dateLabels = { today: tr.todayLabel, yesterday: tr.yesterdayLabel, tomorrow: tr.tomorrowLabel }
 
   useEffect(() => {
     loadTasks(selectedDate)
@@ -94,7 +94,6 @@ export default function Tasks({ userId }: { userId: string }) {
       })
       const classified: { title: string; priority: string; category: string; date: string | null; time: string | null }[] = await res.json()
 
-      // Каждая задача на свою дату (или на выбранный день если дата не указана)
       const toInsert = classified.map((t) => ({
         user_id: userId,
         title: t.title,
@@ -107,15 +106,13 @@ export default function Tasks({ userId }: { userId: string }) {
       const { data } = await supabase.from('tasks').insert(toInsert).select()
 
       if (data) {
-        // Показываем только задачи на выбранный день
         const forToday = data.filter((t) => t.date === selectedDate)
         if (forToday.length > 0) setTasks((prev) => [...forToday, ...prev])
 
-        // Уведомляем о задачах на другие дни
         const otherDates = [...new Set(data.filter((t) => t.date !== selectedDate).map((t) => t.date))]
         if (otherDates.length > 0) {
-          const labels = otherDates.map((d) => formatDateLabel(d)).join(', ')
-          setNotice(`Задачи добавлены на ${labels}`)
+          const labels = otherDates.map((d) => formatDateLabel(d, dateLabels, locale)).join(', ')
+          setNotice(`${tr.tasks.completedSection}: ${labels}`)
           setTimeout(() => setNotice(null), 4000)
         }
       }
@@ -156,11 +153,11 @@ export default function Tasks({ userId }: { userId: string }) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechRecognition) {
-      alert('Голосовой ввод не поддерживается в этом браузере')
+      alert(tr.voiceUnsupported)
       return
     }
     const recognition = new SpeechRecognition()
-    recognition.lang = 'ru-RU'
+    recognition.lang = lang === 'ru' ? 'ru-RU' : 'en-US'
     recognition.continuous = false
     recognition.interimResults = false
     recognition.onstart = () => setListening(true)
@@ -181,7 +178,7 @@ export default function Tasks({ userId }: { userId: string }) {
   return (
     <div className="flex flex-col gap-4">
 
-      {/* Навигатор по датам */}
+      {/* Date navigator */}
       <div className="flex items-center justify-between gap-2">
         <button
           onClick={() => changeDate(-1)}
@@ -190,18 +187,18 @@ export default function Tasks({ userId }: { userId: string }) {
         >
           <ChevronLeft size={18} color="var(--text-muted)" />
           <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
-            {formatDateLabel(toLocalDate(new Date(new Date(selectedDate + 'T00:00:00').getTime() - 86400000))).split(',')[0]}
+            {formatDateLabel(toLocalDate(new Date(new Date(selectedDate + 'T00:00:00').getTime() - 86400000)), dateLabels, locale).split(',')[0]}
           </span>
         </button>
 
         <div className="text-center flex-shrink-0">
           <p className="font-semibold" style={{ color: 'var(--text)', fontSize: '15px' }}>
-            {formatDateLabel(selectedDate)}
+            {formatDateLabel(selectedDate, dateLabels, locale)}
           </p>
           <p style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
             {pending.length === 0
-              ? completed.length > 0 ? 'Всё выполнено 💪' : 'Нет задач'
-              : `${pending.length} активных${completed.length > 0 ? ` · ${completed.length} выполнено` : ''}`}
+              ? completed.length > 0 ? tr.tasks.allDone : tr.tasks.noTasks
+              : tr.tasks.activeCount(pending.length, completed.length)}
           </p>
         </div>
 
@@ -212,12 +209,11 @@ export default function Tasks({ userId }: { userId: string }) {
         >
           <ChevronRight size={18} color="var(--text-muted)" />
           <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
-            {formatDateLabel(toLocalDate(new Date(new Date(selectedDate + 'T00:00:00').getTime() + 86400000))).split(',')[0]}
+            {formatDateLabel(toLocalDate(new Date(new Date(selectedDate + 'T00:00:00').getTime() + 86400000)), dateLabels, locale).split(',')[0]}
           </span>
         </button>
       </div>
 
-      {/* Уведомление о задачах на другие дни */}
       {notice && (
         <div
           className="rounded-xl px-4 py-3 text-sm"
@@ -227,7 +223,6 @@ export default function Tasks({ userId }: { userId: string }) {
         </div>
       )}
 
-      {/* Поле ввода — только для сегодня и будущих дней */}
       {selectedDate >= toLocalDate(new Date()) && (
         <div
           className="rounded-xl p-3 flex flex-col gap-2"
@@ -242,16 +237,11 @@ export default function Tasks({ userId }: { userId: string }) {
                 addTask()
               }
             }}
-            placeholder={isToday ? 'Наговори или напиши задачи на сегодня...' : 'Добавь задачи на этот день...'}
+            placeholder={isToday ? tr.tasks.placeholderToday : tr.tasks.placeholderOther}
             rows={3}
             style={{
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              color: 'var(--text)',
-              fontSize: '15px',
-              resize: 'none',
-              width: '100%',
+              background: 'transparent', border: 'none', outline: 'none',
+              color: 'var(--text)', fontSize: '15px', resize: 'none', width: '100%',
             }}
           />
           <div className="flex gap-2 justify-between items-center">
@@ -261,16 +251,11 @@ export default function Tasks({ userId }: { userId: string }) {
                 background: listening ? 'var(--accent)' : 'var(--surface-2)',
                 border: '1px solid var(--border)',
                 color: listening ? '#fff' : 'var(--text-muted)',
-                borderRadius: '8px',
-                padding: '6px 12px',
-                fontSize: '13px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
+                borderRadius: '8px', padding: '6px 12px', fontSize: '13px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px',
               }}
             >
-              {listening ? '🔴 Слушаю...' : '🎤 Голос'}
+              {listening ? <><MicOff size={14} /> {tr.voiceListening}</> : <><Mic size={14} /> {tr.voiceOn}</>}
             </button>
 
             <button
@@ -280,20 +265,16 @@ export default function Tasks({ userId }: { userId: string }) {
                 background: input.trim() ? 'var(--accent)' : 'var(--surface-2)',
                 border: 'none',
                 color: input.trim() ? '#fff' : 'var(--text-muted)',
-                borderRadius: '8px',
-                padding: '6px 16px',
-                fontSize: '13px',
-                cursor: input.trim() ? 'pointer' : 'default',
-                fontWeight: '600',
+                borderRadius: '8px', padding: '6px 16px', fontSize: '13px',
+                cursor: input.trim() ? 'pointer' : 'default', fontWeight: '600',
               }}
             >
-              {loading ? '...' : 'Добавить'}
+              {loading ? '...' : tr.add}
             </button>
           </div>
         </div>
       )}
 
-      {/* Активные задачи */}
       {pending.length > 0 && (
         <div className="flex flex-col gap-2">
           {pending.map((task) => (
@@ -302,11 +283,10 @@ export default function Tasks({ userId }: { userId: string }) {
         </div>
       )}
 
-      {/* Выполненные задачи */}
       {completed.length > 0 && (
         <div className="flex flex-col gap-2">
           <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-            Выполнено
+            {tr.tasks.completedSection}
           </p>
           {completed.map((task) => (
             <TaskCard key={task.id} task={task} onToggle={toggleTask} onDelete={deleteTask} onEdit={editTask} done />
@@ -314,16 +294,13 @@ export default function Tasks({ userId }: { userId: string }) {
         </div>
       )}
 
-      {/* Пустой день */}
       {tasks.length === 0 && (
         <div
           className="rounded-xl p-4 text-center"
           style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
         >
           <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-            {selectedDate < toLocalDate(new Date())
-              ? 'В этот день задач не было'
-              : 'Нет задач. Добавь что-нибудь, бро!'}
+            {selectedDate < toLocalDate(new Date()) ? tr.tasks.emptyPast : tr.tasks.emptyFuture}
           </p>
         </div>
       )}
@@ -345,6 +322,7 @@ function TaskCard({
   onEdit: (id: string, title: string) => void
   done?: boolean
 }) {
+  const { tr } = useLang()
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(task.title)
 
@@ -355,16 +333,13 @@ function TaskCard({
     setEditing(false)
   }
 
+  const priorityLabel = tr.tasks.priority
+
   return (
     <div
       className="rounded-xl p-4 flex items-start gap-3"
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        opacity: done ? 0.5 : 1,
-      }}
+      style={{ background: 'var(--surface)', border: '1px solid var(--border)', opacity: done ? 0.5 : 1 }}
     >
-      {/* Чекбокс */}
       <button
         onClick={() => onToggle(task)}
         style={{
@@ -379,7 +354,6 @@ function TaskCard({
         {done && '✓'}
       </button>
 
-      {/* Контент */}
       <div className="flex-1 flex flex-col gap-1 min-w-0">
         {editing ? (
           <div className="flex gap-2 items-center">
@@ -419,7 +393,7 @@ function TaskCard({
               </span>
             )}
             <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: (priorityColor[task.priority] ?? '#6b7280') + '22', color: priorityColor[task.priority] ?? '#6b7280', fontWeight: '600' }}>
-              {priorityLabel[task.priority] ?? task.priority}
+              {priorityLabel[task.priority as keyof typeof priorityLabel] ?? task.priority}
             </span>
             {task.category && (
               <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
@@ -430,7 +404,6 @@ function TaskCard({
         )}
       </div>
 
-      {/* Кнопки редактирования и удаления */}
       {!editing && (
         <div className="flex gap-1 flex-shrink-0">
           <button

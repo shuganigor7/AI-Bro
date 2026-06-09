@@ -2,37 +2,45 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
+import { LanguageProvider, useLang } from '@/lib/LanguageContext'
 import Tasks from '@/app/components/Tasks'
 import Finance from '@/app/components/Finance'
 import Health from '@/app/components/Health'
 import Sport from '@/app/components/Sport'
 import StatsPage from '@/app/components/Stats'
-import { ListTodo, Wallet, HeartPlus, Dumbbell, Trophy, LogOut } from 'lucide-react'
-
-const tabs = [
-  { id: 'tasks', label: 'Задачи', Icon: ListTodo, color: '#6366f1' },
-  { id: 'finance', label: 'Финансы', Icon: Wallet, color: '#22c55e' },
-  { id: 'health', label: 'Здоровье', Icon: HeartPlus, color: '#ef4444' },
-  { id: 'sport', label: 'Спорт', Icon: Dumbbell, color: '#f97316' },
-  { id: 'stats', label: 'Статы', Icon: Trophy, color: '#f59e0b' },
-]
+import { ListTodo, Wallet, HeartPlus, Dumbbell, Trophy, LogOut, Globe } from 'lucide-react'
 
 export default function Home() {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
+  )
+}
+
+function AppContent() {
+  const { lang, setLang, tr } = useLang()
   const [activeTab, setActiveTab] = useState('tasks')
   const [userId, setUserId] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [signingIn, setSigningIn] = useState(false)
 
+  const tabs = [
+    { id: 'tasks', label: tr.tabs.tasks, Icon: ListTodo, color: '#6366f1' },
+    { id: 'finance', label: tr.tabs.finance, Icon: Wallet, color: '#22c55e' },
+    { id: 'health', label: tr.tabs.health, Icon: HeartPlus, color: '#ef4444' },
+    { id: 'sport', label: tr.tabs.sport, Icon: Dumbbell, color: '#f97316' },
+    { id: 'stats', label: tr.tabs.stats, Icon: Trophy, color: '#f59e0b' },
+  ]
+
   useEffect(() => {
     const supabase = createClient()
 
-    // Сразу проверяем существующую сессию — не ждём onAuthStateChange
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUserId(session.user.id)
         setUserEmail(session.user.email ?? null)
-        // Upsert профиля в фоне, не блокируем UI
         supabase.from('profiles').upsert({ id: session.user.id }, { onConflict: 'id', ignoreDuplicates: true })
       }
       setLoading(false)
@@ -61,9 +69,7 @@ export default function Home() {
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     })
   }
 
@@ -75,7 +81,7 @@ export default function Home() {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg)' }}>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Загрузка...</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>{tr.loading}</p>
       </div>
     )
   }
@@ -86,11 +92,16 @@ export default function Home() {
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         height: '100vh', background: 'var(--bg)', padding: '32px',
       }}>
+        {/* Language toggle on login screen */}
+        <div style={{ position: 'absolute', top: '24px', right: '24px' }}>
+          <LangToggle lang={lang} setLang={setLang} />
+        </div>
+
         <h1 style={{ fontSize: '36px', fontWeight: '900', color: 'var(--text)', marginBottom: '8px', letterSpacing: '-1px' }}>
           AI <span style={{ color: 'var(--accent)' }}>BRO</span>
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '48px', textAlign: 'center' }}>
-          Твой личный ассистент
+          {tr.tagline}
         </p>
 
         <div style={{ width: '100%', maxWidth: '320px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -111,12 +122,12 @@ export default function Home() {
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
-            {signingIn ? 'Подключение...' : 'Войти через Google'}
+            {signingIn ? tr.connecting : tr.signInGoogle}
           </button>
         </div>
 
         <p style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '32px', textAlign: 'center', lineHeight: 1.6 }}>
-          Данные привязаны к твоему аккаунту и<br />синхронизируются на всех устройствах
+          {tr.dataNote}
         </p>
       </div>
     )
@@ -125,21 +136,22 @@ export default function Home() {
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
 
-      {/* Header */}
       <header className="px-4 pt-6 pb-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
         <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>
           AI <span style={{ color: 'var(--accent)' }}>BRO</span>
         </h1>
-        <button
-          onClick={signOut}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
-          title={userEmail ?? ''}
-        >
-          <LogOut size={18} color="var(--text-muted)" />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <LangToggle lang={lang} setLang={setLang} />
+          <button
+            onClick={signOut}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+            title={userEmail ?? ''}
+          >
+            <LogOut size={18} color="var(--text-muted)" />
+          </button>
+        </div>
       </header>
 
-      {/* Content */}
       <main className="flex-1 overflow-y-auto px-4 py-6">
         <>
           {activeTab === 'tasks' && <Tasks userId={userId} />}
@@ -147,11 +159,9 @@ export default function Home() {
           {activeTab === 'health' && <Health userId={userId} />}
           {activeTab === 'sport' && <Sport userId={userId} />}
           {activeTab === 'stats' && <StatsPage userId={userId} />}
-
         </>
       </main>
 
-      {/* Bottom Navigation */}
       <nav
         className="flex"
         style={{
@@ -179,5 +189,24 @@ export default function Home() {
       </nav>
 
     </div>
+  )
+}
+
+function LangToggle({ lang, setLang }: { lang: string; setLang: (l: 'ru' | 'en') => void }) {
+  return (
+    <button
+      onClick={() => setLang(lang === 'ru' ? 'en' : 'ru')}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '4px',
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: '8px', padding: '4px 8px', cursor: 'pointer',
+      }}
+      title={lang === 'ru' ? 'Switch to English' : 'Переключить на русский'}
+    >
+      <Globe size={14} color="var(--text-muted)" />
+      <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600' }}>
+        {lang === 'ru' ? 'RU' : 'EN'}
+      </span>
+    </button>
   )
 }

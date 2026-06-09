@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useLang } from '@/lib/LanguageContext'
 import { UtensilsCrossed, Car, Gamepad2, Pill, Dumbbell, Zap, Shirt, BookOpen, Briefcase, Laptop, Gift, TrendingUp, Target, Package, ArrowDownLeft, Mic, MicOff, PiggyBank, CreditCard } from 'lucide-react'
 
 type Goal = {
@@ -39,23 +40,6 @@ const categoryIcon: Record<string, { Icon: React.FC<{ size?: number; color?: str
   other:         { Icon: Package,        color: '#6b7280' },
 }
 
-const categoryLabel: Record<string, string> = {
-  food: 'Еда',
-  transport: 'Транспорт',
-  entertainment: 'Развлечения',
-  health: 'Здоровье',
-  sport: 'Спорт',
-  utilities: 'Коммуналка',
-  clothing: 'Одежда',
-  education: 'Обучение',
-  salary: 'Зарплата',
-  freelance: 'Фриланс',
-  gift: 'Подарок',
-  investment: 'Инвестиции',
-  savings: 'Накопления',
-  other: 'Прочее',
-}
-
 function toLocalDate(date: Date): string {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
@@ -73,6 +57,7 @@ function matchGoal(hint: string, goals: Goal[]): Goal | null {
 }
 
 export default function Finance({ userId }: { userId: string }) {
+  const { tr, lang } = useLang()
   const [subTab, setSubTab] = useState<'transactions' | 'goals'>('transactions')
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
@@ -83,6 +68,8 @@ export default function Finance({ userId }: { userId: string }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null)
   const supabase = createClient()
+
+  const locale = lang === 'ru' ? 'ru-RU' : 'en-US'
 
   useEffect(() => {
     loadTransactions()
@@ -157,7 +144,6 @@ export default function Finance({ userId }: { userId: string }) {
         if (forThisMonth.length > 0) setTransactions((prev) => [...forThisMonth, ...prev])
       }
 
-      // Матчим цели и записываем contributions
       const goalNotices: string[] = []
       for (const t of classified) {
         if (!t.goal_hint) continue
@@ -184,13 +170,13 @@ export default function Finance({ userId }: { userId: string }) {
       }
 
       if (goalNotices.length > 0) {
-        setGoalNotice('Добавлено в цель: ' + goalNotices.join(', '))
+        setGoalNotice(tr.finance.goalAddedPrefix + goalNotices.join(', '))
         setTimeout(() => setGoalNotice(null), 4000)
       }
     } catch {
       const amountMatch = text.match(/\d+([.,]\d+)?/)
       const amount = amountMatch ? parseFloat(amountMatch[0].replace(',', '.')) : 0
-      const type = /получил|заработал|доход|зарплата|фриланс/i.test(text) ? 'income' : 'expense'
+      const type = /получил|заработал|доход|зарплата|фриланс|earned|income|salary/i.test(text) ? 'income' : 'expense'
       const { data } = await supabase
         .from('finances')
         .insert({ user_id: userId, type, amount, description: text, date: today })
@@ -206,11 +192,11 @@ export default function Finance({ userId }: { userId: string }) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechRecognition) {
-      alert('Голосовой ввод не поддерживается в этом браузере')
+      alert(tr.voiceUnsupported)
       return
     }
     const recognition = new SpeechRecognition()
-    recognition.lang = 'ru-RU'
+    recognition.lang = lang === 'ru' ? 'ru-RU' : 'en-US'
     recognition.continuous = false
     recognition.interimResults = false
     recognition.onstart = () => setListening(true)
@@ -230,32 +216,29 @@ export default function Finance({ userId }: { userId: string }) {
     return acc
   }, {} as Record<string, Transaction[]>)
   const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
-  const monthLabel = new Date().toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
+  const monthLabel = new Date().toLocaleDateString(locale, { month: 'long', year: 'numeric' })
 
   return (
     <div className="flex flex-col gap-4">
 
-      {/* Суб-навигация */}
+      {/* Sub-nav */}
       <div className="flex rounded-xl p-1 gap-1" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
         {(['transactions', 'goals'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setSubTab(tab)}
             style={{
-              flex: 1,
-              padding: '7px 0',
-              borderRadius: '9px',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: '600',
+              flex: 1, padding: '7px 0', borderRadius: '9px', border: 'none', cursor: 'pointer',
+              fontSize: '13px', fontWeight: '600',
               background: subTab === tab ? 'var(--accent)' : 'transparent',
               color: subTab === tab ? '#fff' : 'var(--text-muted)',
               transition: 'all 0.15s',
             }}
           >
             <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-              {tab === 'transactions' ? <><CreditCard size={14} /> Транзакции</> : <><Target size={14} /> Цели</>}
+              {tab === 'transactions'
+                ? <><CreditCard size={14} /> {tr.finance.transactions}</>
+                : <><Target size={14} /> {tr.finance.goals}</>}
             </span>
           </button>
         ))}
@@ -265,14 +248,13 @@ export default function Finance({ userId }: { userId: string }) {
 
       {subTab === 'transactions' && (
         <>
-          {/* Уведомление о цели */}
           {goalNotice && (
             <div className="rounded-xl px-4 py-3 text-sm" style={{ background: '#22c55e22', border: '1px solid #22c55e', color: '#22c55e' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Target size={14} /> {goalNotice}</span>
             </div>
           )}
 
-          {/* Баланс */}
+          {/* Balance */}
           <div className="rounded-xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
             <p style={{ color: 'var(--text-muted)', fontSize: '11px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '600' }}>
               {monthLabel}
@@ -282,26 +264,26 @@ export default function Finance({ userId }: { userId: string }) {
             </p>
             <div className="flex gap-6">
               <div>
-                <p style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Доходы</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{tr.finance.income}</p>
                 <p style={{ color: '#22c55e', fontSize: '14px', fontWeight: '600' }}>+€{totalIncome.toFixed(2)}</p>
               </div>
               <div>
-                <p style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Расходы</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{tr.finance.expense}</p>
                 <p style={{ color: '#ef4444', fontSize: '14px', fontWeight: '600' }}>-€{totalExpense.toFixed(2)}</p>
               </div>
             </div>
           </div>
 
-          {/* График расходов */}
+          {/* Spending chart */}
           <SpendingBreakdown transactions={transactions} />
 
-          {/* Ввод */}
+          {/* Input */}
           <div className="rounded-xl p-3 flex flex-col gap-2" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addTransaction() } }}
-              placeholder="Потратил 50€ на продукты, отложил 100€ на ноутбук..."
+              placeholder={tr.finance.placeholder}
               rows={2}
               style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: '15px', resize: 'none', width: '100%' }}
             />
@@ -310,31 +292,31 @@ export default function Finance({ userId }: { userId: string }) {
                 onClick={startVoice}
                 style={{ background: listening ? 'var(--accent)' : 'var(--surface-2)', border: '1px solid var(--border)', color: listening ? '#fff' : 'var(--text-muted)', borderRadius: '8px', padding: '6px 12px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                {listening ? <><MicOff size={14} /> Слушаю...</> : <><Mic size={14} /> Голос</>}
+                {listening ? <><MicOff size={14} /> {tr.voiceListening}</> : <><Mic size={14} /> {tr.voiceOn}</>}
               </button>
               <button
                 onClick={addTransaction}
                 disabled={!input.trim() || loading}
                 style={{ background: input.trim() ? 'var(--accent)' : 'var(--surface-2)', border: 'none', color: input.trim() ? '#fff' : 'var(--text-muted)', borderRadius: '8px', padding: '6px 16px', fontSize: '13px', cursor: input.trim() ? 'pointer' : 'default', fontWeight: '600' }}
               >
-                {loading ? '...' : 'Добавить'}
+                {loading ? '...' : tr.add}
               </button>
             </div>
           </div>
 
-          {/* Транзакции */}
+          {/* Transactions list */}
           {sortedDates.length > 0 ? (
             sortedDates.map((date) => (
               <div key={date} className="flex flex-col gap-2">
                 <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                  {new Date(date + 'T00:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
+                  {new Date(date + 'T00:00:00').toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
                 </p>
                 {grouped[date].map((t) => <TransactionCard key={t.id} transaction={t} />)}
               </div>
             ))
           ) : (
             <div className="rounded-xl p-4 text-center" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-              <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Нет транзакций в этом месяце. Добавь первую, бро!</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>{tr.finance.emptyMonth}</p>
             </div>
           )}
         </>
@@ -353,6 +335,7 @@ function Goals({
   goals: Goal[]
   setGoals: React.Dispatch<React.SetStateAction<Goal[]>>
 }) {
+  const { tr, lang } = useLang()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [showNewGoal, setShowNewGoal] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -362,6 +345,7 @@ function Goals({
   const [contribDate, setContribDate] = useState(toLocalDate(new Date()))
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
+  const locale = lang === 'ru' ? 'ru-RU' : 'en-US'
 
   async function addGoal() {
     if (!newTitle.trim() || !newTarget || saving) return
@@ -406,7 +390,7 @@ function Goals({
         onClick={() => setShowNewGoal((v) => !v)}
         style={{ background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '10px', padding: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
       >
-        {showNewGoal ? 'Отмена' : '+ Новая цель'}
+        {showNewGoal ? tr.cancel : tr.finance.newGoal}
       </button>
 
       {showNewGoal && (
@@ -414,7 +398,7 @@ function Goals({
           <input
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="Название цели (напр. Новый ноутбук)"
+            placeholder={tr.finance.goalTitlePlaceholder}
             style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text)', fontSize: '14px', outline: 'none', width: '100%' }}
           />
           <div className="flex gap-2 items-center">
@@ -423,7 +407,7 @@ function Goals({
               type="number"
               value={newTarget}
               onChange={(e) => setNewTarget(e.target.value)}
-              placeholder="Сумма цели"
+              placeholder={tr.finance.goalAmountPlaceholder}
               style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 12px', color: 'var(--text)', fontSize: '14px', outline: 'none', flex: 1 }}
             />
           </div>
@@ -432,14 +416,14 @@ function Goals({
             disabled={!newTitle.trim() || !newTarget || saving}
             style={{ background: newTitle.trim() && newTarget ? 'var(--accent)' : 'var(--surface-2)', border: 'none', color: newTitle.trim() && newTarget ? '#fff' : 'var(--text-muted)', borderRadius: '8px', padding: '8px', fontSize: '14px', fontWeight: '600', cursor: newTitle.trim() && newTarget ? 'pointer' : 'default' }}
           >
-            {saving ? '...' : 'Создать'}
+            {saving ? '...' : tr.create}
           </button>
         </div>
       )}
 
       {goals.length === 0 && !showNewGoal && (
         <div className="rounded-xl p-4 text-center" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Нет финансовых целей. Создай первую, бро!</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>{tr.finance.emptyGoals}</p>
         </div>
       )}
 
@@ -471,10 +455,10 @@ function Goals({
               </div>
               <div className="flex justify-between">
                 <p style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
-                  Накоплено: <span style={{ color: 'var(--text)', fontWeight: '600' }}>€{saved.toFixed(2)}</span>
+                  {tr.finance.goalSaved}: <span style={{ color: 'var(--text)', fontWeight: '600' }}>€{saved.toFixed(2)}</span>
                 </p>
                 <p style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
-                  Цель: <span style={{ color: 'var(--text)', fontWeight: '600' }}>€{Number(goal.target_amount).toFixed(2)}</span>
+                  {tr.finance.goalTarget}: <span style={{ color: 'var(--text)', fontWeight: '600' }}>€{Number(goal.target_amount).toFixed(2)}</span>
                 </p>
               </div>
             </button>
@@ -482,7 +466,7 @@ function Goals({
             {isExpanded && (
               <div style={{ borderTop: '1px solid var(--border)', padding: '12px 16px' }} className="flex flex-col gap-3">
                 <div className="flex flex-col gap-2">
-                  <p style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}>Отложить деньги</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}>{tr.finance.goalDeposit}</p>
                   <div className="flex gap-2">
                     <div className="flex items-center gap-1" style={{ flex: 1 }}>
                       <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>€</span>
@@ -490,7 +474,7 @@ function Goals({
                         type="number"
                         value={contribAmount}
                         onChange={(e) => setContribAmount(e.target.value)}
-                        placeholder="Сумма"
+                        placeholder={tr.finance.goalAmountPlaceholder}
                         style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 10px', color: 'var(--text)', fontSize: '14px', outline: 'none', width: '100%' }}
                       />
                     </div>
@@ -504,7 +488,7 @@ function Goals({
                   <input
                     value={contribNote}
                     onChange={(e) => setContribNote(e.target.value)}
-                    placeholder="Заметка (необязательно)"
+                    placeholder={tr.finance.notePlaceholder}
                     style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '7px 10px', color: 'var(--text)', fontSize: '14px', outline: 'none', width: '100%' }}
                   />
                   <button
@@ -512,18 +496,18 @@ function Goals({
                     disabled={!contribAmount || saving}
                     style={{ background: contribAmount ? 'var(--accent)' : 'var(--surface-2)', border: 'none', color: contribAmount ? '#fff' : 'var(--text-muted)', borderRadius: '8px', padding: '8px', fontSize: '13px', fontWeight: '600', cursor: contribAmount ? 'pointer' : 'default' }}
                   >
-                    {saving ? '...' : 'Добавить'}
+                    {saving ? '...' : tr.add}
                   </button>
                 </div>
 
                 {sortedContribs.length > 0 && (
                   <div className="flex flex-col gap-2">
-                    <p style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}>История</p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}>{tr.finance.goalHistory}</p>
                     {sortedContribs.map((c) => (
                       <div key={c.id} className="flex justify-between items-center">
                         <div>
                           <p style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
-                            {new Date(c.date + 'T00:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            {new Date(c.date + 'T00:00:00').toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })}
                           </p>
                           {c.note && <p style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{c.note}</p>}
                         </div>
@@ -542,6 +526,7 @@ function Goals({
 }
 
 function SpendingBreakdown({ transactions }: { transactions: Transaction[] }) {
+  const { tr } = useLang()
   const expenses = transactions.filter((t) => t.type === 'expense' && t.category !== 'savings')
   if (expenses.length === 0) return null
 
@@ -557,17 +542,18 @@ function SpendingBreakdown({ transactions }: { transactions: Transaction[] }) {
   return (
     <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
       <p style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '600' }}>
-        Куда уходят деньги
+        {tr.finance.spendingChart}
       </p>
       {sorted.map(([cat, amount]) => {
         const { Icon, color } = categoryIcon[cat] ?? categoryIcon.other
+        const catLabel = tr.finance.categories[cat as keyof typeof tr.finance.categories] ?? cat
         const pct = Math.round((amount / total) * 100)
         return (
           <div key={cat}>
             <div className="flex items-center justify-between" style={{ marginBottom: '5px' }}>
               <div className="flex items-center gap-2">
                 <Icon size={13} color={color} />
-                <span style={{ color: 'var(--text)', fontSize: '12px' }}>{categoryLabel[cat] ?? cat}</span>
+                <span style={{ color: 'var(--text)', fontSize: '12px' }}>{catLabel}</span>
               </div>
               <div className="flex items-center gap-3">
                 <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{pct}%</span>
@@ -587,10 +573,12 @@ function SpendingBreakdown({ transactions }: { transactions: Transaction[] }) {
 }
 
 function TransactionCard({ transaction: t }: { transaction: Transaction }) {
+  const { tr } = useLang()
   const cat = categoryIcon[t.category ?? 'other'] ?? categoryIcon.other
   const iconColor = t.type === 'income' ? '#22c55e' : cat.color
   const bgColor = iconColor + '22'
   const IconComponent = t.type === 'income' ? ArrowDownLeft : (t.category === 'savings' ? Target : cat.Icon)
+  const catLabel = t.category ? (tr.finance.categories[t.category as keyof typeof tr.finance.categories] ?? t.category) : ''
   return (
     <div className="rounded-xl p-4 flex items-center gap-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
       <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -598,10 +586,10 @@ function TransactionCard({ transaction: t }: { transaction: Transaction }) {
       </div>
       <div className="flex-1 min-w-0">
         <p style={{ color: 'var(--text)', fontSize: '14px', lineHeight: '1.4', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {t.description || categoryLabel[t.category ?? 'other'] || t.category}
+          {t.description || catLabel || t.category}
         </p>
         {t.category && (
-          <p style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{categoryLabel[t.category] ?? t.category}</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{catLabel}</p>
         )}
       </div>
       <p style={{ color: t.type === 'income' ? '#22c55e' : t.category === 'savings' ? 'var(--accent)' : '#ef4444', fontSize: '16px', fontWeight: '700', flexShrink: 0 }}>
