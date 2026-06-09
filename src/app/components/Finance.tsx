@@ -292,6 +292,9 @@ export default function Finance({ userId }: { userId: string }) {
             </div>
           </div>
 
+          {/* График расходов */}
+          <SpendingBreakdown transactions={transactions} />
+
           {/* Ввод */}
           <div className="rounded-xl p-3 flex flex-col gap-2" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
             <textarea
@@ -531,6 +534,51 @@ function Goals({
                 )}
               </div>
             )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function SpendingBreakdown({ transactions }: { transactions: Transaction[] }) {
+  const expenses = transactions.filter((t) => t.type === 'expense' && t.category !== 'savings')
+  if (expenses.length === 0) return null
+
+  const byCategory: Record<string, number> = {}
+  for (const t of expenses) {
+    const cat = t.category ?? 'other'
+    byCategory[cat] = (byCategory[cat] ?? 0) + t.amount
+  }
+
+  const sorted = Object.entries(byCategory).sort((a, b) => b[1] - a[1]).slice(0, 4)
+  const total = sorted.reduce((s, [, v]) => s + v, 0)
+
+  return (
+    <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+      <p style={{ color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '600' }}>
+        Куда уходят деньги
+      </p>
+      {sorted.map(([cat, amount]) => {
+        const { Icon, color } = categoryIcon[cat] ?? categoryIcon.other
+        const pct = Math.round((amount / total) * 100)
+        return (
+          <div key={cat}>
+            <div className="flex items-center justify-between" style={{ marginBottom: '5px' }}>
+              <div className="flex items-center gap-2">
+                <Icon size={13} color={color} />
+                <span style={{ color: 'var(--text)', fontSize: '12px' }}>{categoryLabel[cat] ?? cat}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{pct}%</span>
+                <span style={{ color: 'var(--text)', fontSize: '13px', fontWeight: '700', minWidth: '48px', textAlign: 'right' }}>
+                  €{amount.toFixed(0)}
+                </span>
+              </div>
+            </div>
+            <div style={{ height: '4px', background: 'var(--surface-2)', borderRadius: '2px' }}>
+              <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '2px', transition: 'width 0.4s ease' }} />
+            </div>
           </div>
         )
       })}

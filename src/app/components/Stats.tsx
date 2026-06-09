@@ -146,8 +146,12 @@ export default function StatsPage({ userId }: { userId: string }) {
           {loading ? <RefreshCw size={36} color="var(--text-muted)" /> : <AvatarIcon size={44} color={avatarColor} strokeWidth={1.5} />}
         </div>
         <div className="text-center">
-          <p style={{ color: 'var(--text)', fontSize: '20px', fontWeight: '800' }}>Уровень {level}</p>
-          <p style={{ color: 'var(--accent)', fontSize: '13px', fontWeight: '600', marginTop: '2px' }}>{levelTitle}</p>
+          <p style={{ color: 'var(--text)', fontSize: '20px', fontWeight: '800' }}>
+            {loading ? '...' : `Уровень ${level}`}
+          </p>
+          <p style={{ color: 'var(--accent)', fontSize: '13px', fontWeight: '600', marginTop: '2px' }}>
+            {loading ? 'Считаю статы' : levelTitle}
+          </p>
         </div>
 
         {/* Общая шкала */}
@@ -155,14 +159,16 @@ export default function StatsPage({ userId }: { userId: string }) {
           <div
             style={{
               height: '100%',
-              width: `${level}%`,
+              width: loading ? '0%' : `${level}%`,
               borderRadius: '4px',
               background: 'linear-gradient(90deg, var(--accent), #22c55e)',
               transition: 'width 0.6s ease',
             }}
           />
         </div>
-        <p style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Общий прогресс: {level}/100</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+          {loading ? ' ' : `Общий прогресс: ${level}/100`}
+        </p>
       </div>
 
       {/* Четыре стата */}
