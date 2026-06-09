@@ -8,7 +8,6 @@ import Health from '@/app/components/Health'
 import Sport from '@/app/components/Sport'
 import StatsPage from '@/app/components/Stats'
 import { ListTodo, Wallet, HeartPlus, Dumbbell, Trophy, LogOut } from 'lucide-react'
-import WaterWidget from '@/app/components/WaterWidget'
 
 const tabs = [
   { id: 'tasks', label: 'Задачи', Icon: ListTodo, color: '#6366f1' },
@@ -143,12 +142,7 @@ export default function Home() {
       {/* Content */}
       <main className="flex-1 overflow-y-auto px-4 py-6">
         <>
-          {activeTab === 'tasks' && (
-            <div className="flex flex-col gap-4">
-              <WaterWidget userId={userId} />
-              <Tasks userId={userId} />
-            </div>
-          )}
+          {activeTab === 'tasks' && <Tasks userId={userId} />}
           {activeTab === 'finance' && <Finance userId={userId} />}
           {activeTab === 'health' && <Health userId={userId} />}
           {activeTab === 'sport' && <Sport userId={userId} />}
