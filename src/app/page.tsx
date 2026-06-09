@@ -27,31 +27,33 @@ export default function Home() {
   useEffect(() => {
     const supabase = createClient()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Сразу проверяем существующую сессию — не ждём onAuthStateChange
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        await supabase
-          .from('profiles')
-          .upsert({ id: session.user.id }, { onConflict: 'id', ignoreDuplicates: true })
         setUserId(session.user.id)
         setUserEmail(session.user.email ?? null)
-        // Убираем code из URL после успешного входа
-        if (window.location.search.includes('code=')) {
-          window.history.replaceState({}, '', window.location.pathname)
-        }
-      } else {
-        setUserId(null)
-        setUserEmail(null)
+        // Upsert профиля в фоне, не блокируем UI
+        supabase.from('profiles').upsert({ id: session.user.id }, { onConflict: 'id', ignoreDuplicates: true })
       }
       setLoading(false)
     })
 
-    // Fallback — если onAuthStateChange не сработал за 3 секунды
-    const timeout = setTimeout(() => setLoading(false), 3000)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUserId(session.user.id)
+        setUserEmail(session.user.email ?? null)
+        supabase.from('profiles').upsert({ id: session.user.id }, { onConflict: 'id', ignoreDuplicates: true })
+        if (window.location.search.includes('code=')) {
+          window.history.replaceState({}, '', window.location.pathname)
+        }
+      }
+      if (event === 'SIGNED_OUT') {
+        setUserId(null)
+        setUserEmail(null)
+      }
+    })
 
-    return () => {
-      subscription.unsubscribe()
-      clearTimeout(timeout)
-    }
+    return () => subscription.unsubscribe()
   }, [])
 
   async function signInWithGoogle() {
