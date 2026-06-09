@@ -90,7 +90,7 @@ export default function Tasks({ userId }: { userId: string }) {
       const res = await fetch('https://www.nnnis.site/webhook/aibro-tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, today: selectedDate }),
+        body: JSON.stringify({ text, today: selectedDate, lang }),
       })
       const classified: { title: string; priority: string; category: string; date: string | null; time: string | null }[] = await res.json()
 
