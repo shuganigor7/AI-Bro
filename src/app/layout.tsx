@@ -9,6 +9,13 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "AI BRO",
   },
+  icons: {
+    apple: "/apple-touch-icon.png",
+    icon: [
+      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+  },
 };
 
 export const viewport: Viewport = {
