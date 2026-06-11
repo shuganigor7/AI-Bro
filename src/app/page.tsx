@@ -25,6 +25,7 @@ function AppContent() {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [signingIn, setSigningIn] = useState(false)
+  const [profileError, setProfileError] = useState<string | null>(null)
 
   const tabs = [
     { id: 'tasks', label: tr.tabs.tasks, Icon: ListTodo, color: '#6366f1' },
@@ -42,6 +43,7 @@ function AppContent() {
         setUserId(session.user.id)
         setUserEmail(session.user.email ?? null)
         supabase.from('profiles').upsert({ id: session.user.id }, { onConflict: 'id', ignoreDuplicates: true })
+          .then(({ error }) => { if (error) setProfileError(error.message) })
       }
       setLoading(false)
     })
@@ -51,6 +53,7 @@ function AppContent() {
         setUserId(session.user.id)
         setUserEmail(session.user.email ?? null)
         supabase.from('profiles').upsert({ id: session.user.id }, { onConflict: 'id', ignoreDuplicates: true })
+          .then(({ error }) => { if (error) setProfileError(error.message) })
         if (window.location.search.includes('code=')) {
           window.history.replaceState({}, '', window.location.pathname)
         }
@@ -153,6 +156,14 @@ function AppContent() {
       </header>
 
       <main className="flex-1 overflow-y-auto px-4 py-6">
+        {profileError && (
+          <div
+            className="rounded-xl px-4 py-3 text-sm mb-4"
+            style={{ background: '#ef444422', border: '1px solid #ef4444', color: '#ef4444', wordBreak: 'break-word' }}
+          >
+            ⚠ Profile error: {profileError}
+          </div>
+        )}
         <>
           {activeTab === 'tasks' && <Tasks userId={userId} />}
           {activeTab === 'finance' && <Finance userId={userId} />}

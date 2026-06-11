@@ -53,6 +53,7 @@ export default function Tasks({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(false)
   const [listening, setListening] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null)
   const supabase = createClient()
@@ -85,6 +86,7 @@ export default function Tasks({ userId }: { userId: string }) {
     if (!text || loading) return
     setLoading(true)
     setInput('')
+    setErrorMsg(null)
 
     try {
       const res = await fetch('https://www.nnnis.site/webhook/aibro-tasks', {
@@ -103,7 +105,9 @@ export default function Tasks({ userId }: { userId: string }) {
         time: t.time ?? null,
       }))
 
-      const { data } = await supabase.from('tasks').insert(toInsert).select()
+      const { data, error } = await supabase.from('tasks').insert(toInsert).select()
+
+      if (error) setErrorMsg(`Insert error: ${error.message}`)
 
       if (data) {
         const forToday = data.filter((t) => t.date === selectedDate)
@@ -116,12 +120,14 @@ export default function Tasks({ userId }: { userId: string }) {
           setTimeout(() => setNotice(null), 4000)
         }
       }
-    } catch {
-      const { data } = await supabase
+    } catch (err) {
+      setErrorMsg(`Fetch error: ${err instanceof Error ? err.message : String(err)}`)
+      const { data, error } = await supabase
         .from('tasks')
         .insert({ user_id: userId, title: text, priority: 'medium', date: selectedDate })
         .select()
         .single()
+      if (error) setErrorMsg((prev) => `${prev} | Insert error: ${error.message}`)
       if (data) setTasks((prev) => [data, ...prev])
     }
 
@@ -220,6 +226,15 @@ export default function Tasks({ userId }: { userId: string }) {
           style={{ background: '#7c3aed22', border: '1px solid var(--accent)', color: 'var(--accent)' }}
         >
           ✓ {notice}
+        </div>
+      )}
+
+      {errorMsg && (
+        <div
+          className="rounded-xl px-4 py-3 text-sm"
+          style={{ background: '#ef444422', border: '1px solid #ef4444', color: '#ef4444', wordBreak: 'break-word' }}
+        >
+          ⚠ {errorMsg}
         </div>
       )}
 
