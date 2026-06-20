@@ -456,7 +456,9 @@ export default function Sport({ userId }: { userId: string }) {
                                       {lang === 'ru' ? `Подход ${si + 1}` : `Set ${si + 1}`}
                                     </span>
                                     <span style={{ color: 'var(--accent)', fontSize: '13px', flex: 1 }}>
-                                      {formatSet(s) || '—'}
+                                      {s.sets === 1
+                                        ? [s.reps ? `${s.reps} ${tr.sport.repsAbbr}` : '', s.weight_kg ? `${s.weight_kg} ${tr.sport.weightUnit}` : ''].filter(Boolean).join(' · ') || '—'
+                                        : formatSet(s) || '—'}
                                     </span>
                                     <div className="flex gap-1 flex-shrink-0">
                                       <button onClick={() => startEditSet(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '3px' }}>
