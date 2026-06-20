@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useLang } from '@/lib/LanguageContext'
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Mic, MicOff, Dumbbell, Activity, PersonStanding, Bike, Waves, Gamepad2, Trash2, Pencil, Check, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Mic, MicOff, Dumbbell, Activity, PersonStanding, Bike, Waves, Gamepad2, Trash2, Pencil, Check, X, Plus } from 'lucide-react'
 
 type WorkoutSet = {
   id: string
@@ -165,6 +165,26 @@ export default function Sport({ userId }: { userId: string }) {
       )
     )
     setEditingSetId(null)
+  }
+
+  async function addSet(workoutId: string, exercise: string, weightKg: number | null) {
+    const { data } = await supabase
+      .from('workout_sets')
+      .insert({ workout_id: workoutId, exercise, sets: 1, reps: null, weight_kg: weightKg })
+      .select()
+      .single()
+    if (data) {
+      setWorkouts((prev) =>
+        prev.map((w) =>
+          w.id === workoutId ? { ...w, workout_sets: [...w.workout_sets, data] } : w
+        )
+      )
+      setEditingSetId(data.id)
+      setEditExercise(exercise)
+      setEditSets('1')
+      setEditReps('')
+      setEditWeight(weightKg != null ? String(weightKg) : '')
+    }
   }
 
   async function addExercises(workoutId: string) {
@@ -379,79 +399,89 @@ export default function Sport({ userId }: { userId: string }) {
 
             {isExpanded && (
               <div style={{ borderTop: '1px solid var(--border)' }}>
-                {workout.workout_sets.length > 0 && (
-                  <div style={{ padding: '12px 16px' }} className="flex flex-col gap-2">
-                    {workout.workout_sets.map((s, i) => (
-                      <div key={s.id}>
-                        {editingSetId === s.id ? (
-                          <div className="flex flex-col gap-2" style={{ background: 'var(--surface-2)', borderRadius: '10px', padding: '10px' }}>
-                            <input
-                              autoFocus
-                              value={editExercise}
-                              onChange={(e) => setEditExercise(e.target.value)}
-                              style={{ background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: '8px', padding: '6px 10px', color: 'var(--text)', fontSize: '14px', outline: 'none', width: '100%' }}
-                            />
-                            <div className="flex gap-2">
-                              <input
-                                type="number"
-                                value={editSets}
-                                onChange={(e) => setEditSets(e.target.value)}
-                                placeholder={tr.sport.setsAbbr}
-                                style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 8px', color: 'var(--text)', fontSize: '13px', outline: 'none' }}
-                              />
-                              <input
-                                type="number"
-                                value={editReps}
-                                onChange={(e) => setEditReps(e.target.value)}
-                                placeholder={tr.sport.repsAbbr}
-                                style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 8px', color: 'var(--text)', fontSize: '13px', outline: 'none' }}
-                              />
-                              <input
-                                type="number"
-                                value={editWeight}
-                                onChange={(e) => setEditWeight(e.target.value)}
-                                placeholder={tr.sport.weightUnit}
-                                style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 8px', color: 'var(--text)', fontSize: '13px', outline: 'none' }}
-                              />
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => saveEditSet(s.id, workout.id)}
-                                style={{ flex: 1, background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '8px', padding: '7px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
-                              >
-                                <Check size={14} /> {tr.add}
-                              </button>
-                              <button
-                                onClick={() => setEditingSetId(null)}
-                                style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: '8px', padding: '7px 12px', fontSize: '13px', cursor: 'pointer' }}
-                              >
-                                <X size={14} />
-                              </button>
-                            </div>
+                {workout.workout_sets.length > 0 && (() => {
+                  const groups: { name: string; sets: WorkoutSet[] }[] = []
+                  for (const s of workout.workout_sets) {
+                    const g = groups.find((g) => g.name === s.exercise)
+                    if (g) g.sets.push(s)
+                    else groups.push({ name: s.exercise, sets: [s] })
+                  }
+                  return (
+                    <div style={{ padding: '12px 16px' }} className="flex flex-col gap-3">
+                      {groups.map((group, gi) => (
+                        <div key={group.name + gi}>
+                          <p style={{ color: 'var(--text)', fontSize: '13px', fontWeight: '700', marginBottom: '6px' }}>
+                            {gi + 1}. {group.name}
+                          </p>
+                          <div className="flex flex-col gap-1" style={{ paddingLeft: '12px' }}>
+                            {group.sets.map((s, si) => (
+                              <div key={s.id}>
+                                {editingSetId === s.id ? (
+                                  <div className="flex flex-col gap-2" style={{ background: 'var(--surface-2)', borderRadius: '10px', padding: '10px' }}>
+                                    <div className="flex gap-2">
+                                      <input
+                                        autoFocus
+                                        type="number"
+                                        value={editReps}
+                                        onChange={(e) => setEditReps(e.target.value)}
+                                        placeholder={tr.sport.repsAbbr}
+                                        style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: '8px', padding: '6px 8px', color: 'var(--text)', fontSize: '13px', outline: 'none' }}
+                                      />
+                                      <input
+                                        type="number"
+                                        value={editWeight}
+                                        onChange={(e) => setEditWeight(e.target.value)}
+                                        placeholder={tr.sport.weightUnit}
+                                        style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 8px', color: 'var(--text)', fontSize: '13px', outline: 'none' }}
+                                      />
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => saveEditSet(s.id, workout.id)}
+                                        style={{ flex: 1, background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '8px', padding: '7px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                                      >
+                                        <Check size={14} /> {tr.add}
+                                      </button>
+                                      <button
+                                        onClick={() => { setEditingSetId(null); deleteSet(s.id, workout.id) }}
+                                        style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: '8px', padding: '7px 12px', fontSize: '13px', cursor: 'pointer' }}
+                                      >
+                                        <X size={14} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '11px', minWidth: '56px' }}>
+                                      {lang === 'ru' ? `Подход ${si + 1}` : `Set ${si + 1}`}
+                                    </span>
+                                    <span style={{ color: 'var(--accent)', fontSize: '13px', flex: 1 }}>
+                                      {formatSet(s) || '—'}
+                                    </span>
+                                    <div className="flex gap-1 flex-shrink-0">
+                                      <button onClick={() => startEditSet(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '3px' }}>
+                                        <Pencil size={12} color="var(--text-muted)" />
+                                      </button>
+                                      <button onClick={() => deleteSet(s.id, workout.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '3px' }}>
+                                        <Trash2 size={12} color="#ef444477" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            <button
+                              onClick={() => addSet(workout.id, group.name, group.sets[group.sets.length - 1]?.weight_kg ?? null)}
+                              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', color: 'var(--accent)', fontSize: '12px', fontWeight: '600', cursor: 'pointer', padding: '4px 0', marginTop: '2px' }}
+                            >
+                              <Plus size={12} /> {lang === 'ru' ? 'подход' : 'add set'}
+                            </button>
                           </div>
-                        ) : (
-                          <div className="flex items-center gap-3">
-                            <span style={{ color: 'var(--text-muted)', fontSize: '12px', width: '20px', flexShrink: 0 }}>{i + 1}.</span>
-                            <div className="flex-1">
-                              <p style={{ color: 'var(--text)', fontSize: '14px', fontWeight: '600' }}>{s.exercise}</p>
-                              {formatSet(s) && (
-                                <p style={{ color: 'var(--accent)', fontSize: '12px' }}>{formatSet(s)}</p>
-                              )}
-                            </div>
-                            <div className="flex gap-1 flex-shrink-0">
-                              <button onClick={() => startEditSet(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '3px' }}>
-                                <Pencil size={13} color="var(--text-muted)" />
-                              </button>
-                              <button onClick={() => deleteSet(s.id, workout.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '3px' }}>
-                                <Trash2 size={13} color="#ef444477" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
 
                 <div style={{ padding: '12px 16px', borderTop: workout.workout_sets.length > 0 ? '1px solid var(--border)' : 'none' }} className="flex flex-col gap-2">
                     <textarea
