@@ -67,6 +67,9 @@ export default function Sport({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(false)
   const [listening, setListening] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [workoutName, setWorkoutName] = useState('')
+  const [editingNotesId, setEditingNotesId] = useState<string | null>(null)
+  const [editNotesValue, setEditNotesValue] = useState('')
   const [editingSetId, setEditingSetId] = useState<string | null>(null)
   const [editExercise, setEditExercise] = useState('')
   const [editSets, setEditSets] = useState('')
@@ -112,6 +115,7 @@ export default function Sport({ userId }: { userId: string }) {
         date: selectedDate,
         type: selectedType,
         duration_min: duration ? parseInt(duration) : null,
+        notes: workoutName.trim() || null,
       })
       .select('*, workout_sets(id, exercise, sets, reps, weight_kg)')
       .single()
@@ -120,8 +124,18 @@ export default function Sport({ userId }: { userId: string }) {
       setExpandedId(data.id)
       setShowNew(false)
       setDuration('')
+      setWorkoutName('')
     }
     setCreating(false)
+  }
+
+  async function saveWorkoutName(workoutId: string) {
+    const notes = editNotesValue.trim() || null
+    await supabase.from('workouts').update({ notes }).eq('id', workoutId)
+    setWorkouts((prev) =>
+      prev.map((w) => (w.id === workoutId ? { ...w, notes } : w))
+    )
+    setEditingNotesId(null)
   }
 
   async function deleteWorkout(workoutId: string) {
@@ -314,6 +328,12 @@ export default function Sport({ userId }: { userId: string }) {
 
       {showNew && (
         <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <input
+            value={workoutName}
+            onChange={(e) => setWorkoutName(e.target.value)}
+            placeholder={tr.sport.workoutNamePlaceholder}
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 12px', color: 'var(--text)', fontSize: '15px', outline: 'none', width: '100%', fontWeight: '600' }}
+          />
           <p style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}>{tr.sport.workoutTypeLabel}</p>
           <div className="flex flex-wrap gap-2">
             {workoutTypesMeta.map((t) => (
@@ -380,8 +400,29 @@ export default function Sport({ userId }: { userId: string }) {
                 <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: typeMeta.color + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <typeMeta.Icon size={22} color={typeMeta.color} />
                 </div>
-                <div className="flex-1">
-                  <p style={{ color: 'var(--text)', fontSize: '15px', fontWeight: '600' }}>{typeLabel}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1">
+                    {editingNotesId === workout.id ? (
+                      <input
+                        autoFocus
+                        value={editNotesValue}
+                        onChange={(e) => setEditNotesValue(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveWorkoutName(workout.id); if (e.key === 'Escape') setEditingNotesId(null) }}
+                        onBlur={() => saveWorkoutName(workout.id)}
+                        placeholder={tr.sport.workoutNamePlaceholder}
+                        style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '2px 8px', color: 'var(--text)', fontSize: '15px', fontWeight: '600', outline: 'none' }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <p
+                        style={{ color: 'var(--text)', fontSize: '15px', fontWeight: '600', cursor: 'text', flex: 1 }}
+                        onClick={(e) => { e.stopPropagation(); setEditingNotesId(workout.id); setEditNotesValue(workout.notes ?? '') }}
+                      >
+                        {workout.notes || typeLabel}
+                        {!workout.notes && <span style={{ color: 'var(--text-muted)', fontWeight: '400', fontSize: '13px' }}> ({typeLabel})</span>}
+                      </p>
+                    )}
+                  </div>
                   <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '2px' }}>
                     {workout.workout_sets.length > 0
                       ? tr.sport.workoutSummary(new Set(workout.workout_sets.map((s) => s.exercise)).size, workout.workout_sets.length)
