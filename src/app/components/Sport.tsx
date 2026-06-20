@@ -383,7 +383,9 @@ export default function Sport({ userId }: { userId: string }) {
                 <div className="flex-1">
                   <p style={{ color: 'var(--text)', fontSize: '15px', fontWeight: '600' }}>{typeLabel}</p>
                   <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '2px' }}>
-                    {tr.sport.exerciseCount(workout.workout_sets.length)}
+                    {workout.workout_sets.length > 0
+                      ? tr.sport.workoutSummary(new Set(workout.workout_sets.map((s) => s.exercise)).size, workout.workout_sets.length)
+                      : tr.sport.exerciseCount(0)}
                     {workout.duration_min ? ` · ${tr.sport.minLabel(workout.duration_min)}` : ''}
                   </p>
                 </div>
